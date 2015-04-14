@@ -5,117 +5,145 @@ import java.util.List;
 
 import com.mobeta.android.dslv.DragSortListView;
 
-
-import android.app.ListActivity;
+import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.TextView;
+import android.util.Log;
+import android.view.Window;
+import android.widget.ListView;
 
-public class MainActivity extends ListActivity {
+public class MainActivity extends Activity {
+	
+	SharedPreferences preferences;
+	SharedPreferences.Editor editor;
+	//关注列表相关
+	private ArrayList<Column> followList = new ArrayList<Column>();
+	private DragSortListView followListView;
+	private FollowAdapter mFollowAdapter;
+	//未关注列表相关
+	private ArrayList<Column> notFollowList = new ArrayList<Column>();
+	private ListView notFollowListView;
+	private NotFollowAdapter mNotFollowAdapter;
+	
+	//增加一个临时变量 保存所有的值 因为在后面列表为空时存在问题
+	private ArrayList<Column> allList = new ArrayList<Column>();;
 
-	private JazzAdapter adapter;
-
-	private ArrayList<JazzArtist> mArtists;
-
-	private String[] mArtistNames;
-	private String[] mArtistAlbums;
-
+	// 监听器在手机拖动停下的时候触发
 	private DragSortListView.DropListener onDrop = new DragSortListView.DropListener() {
 		@Override
-		public void drop(int from, int to) {
-			JazzArtist item = adapter.getItem(from);
-
-			adapter.remove(item);
-			adapter.insert(item, to);
+		public void drop(int from, int to) {// from to 分别表示 被拖动控件原位置 和目标位置
+			if (from != to) {
+				Column column = (Column) mFollowAdapter.getItem(from);// 得到listview的适配器
+				mFollowAdapter.remove(from);// 在适配器中”原位置“的数据。
+				mFollowAdapter.insert(column, to);// 在目标位置中插入被拖动的控件。
+			}
 		}
 	};
-
+	
+	// 删除监听器，点击左边差号就触发。删除item操作。
 	private DragSortListView.RemoveListener onRemove = new DragSortListView.RemoveListener() {
 		@Override
 		public void remove(int which) {
-			adapter.remove(adapter.getItem(which));
+			
+			//未关注列表增加一行
+			if (followList.size() != 0) {
+				Column column = (Column) mFollowAdapter.getItem(which);
+				editor.putBoolean(column.name, false);
+				notFollowList.add(column);
+				mNotFollowAdapter.notifyDataSetChanged();
+			}else {
+				notFollowList.clear();
+				notFollowList.addAll(allList);
+				mNotFollowAdapter.notifyDataSetChanged();
+			}
+			//再删除
+			mFollowAdapter.remove(which);
+			
 		}
 	};
 
-	
 	@Override
-	public void onCreate(Bundle savedInstanceState) {
+	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.hetero_main);
+		requestWindowFeature(Window.FEATURE_NO_TITLE); // 设置无标题
+		setContentView(R.layout.activity_main);
+		initView();
+		initData();
+		initSavaData();
+		
+		followListView.setDropListener(onDrop);
+		followListView.setRemoveListener(onRemove);
 
-		DragSortListView lv = (DragSortListView) getListView();
+		mFollowAdapter = new FollowAdapter(MainActivity.this, followList);
+		followListView.setAdapter(mFollowAdapter);
+		followListView.setDragEnabled(true); // 设置是否可拖动。
 
-		lv.setDropListener(onDrop);
-		lv.setRemoveListener(onRemove);
-
-		mArtistNames = getResources().getStringArray(R.array.jazz_artist_names);
-		mArtistAlbums = getResources().getStringArray(
-				R.array.jazz_artist_albums);
-
-		mArtists = new ArrayList<JazzArtist>();
-		JazzArtist ja;
-		for (int i = 0; i < mArtistNames.length; ++i) {
-			ja = new JazzArtist();
-			ja.name = mArtistNames[i];
-			if (i < mArtistAlbums.length) {
-				ja.albums = mArtistAlbums[i];
-			} else {
-				ja.albums = "No albums listed";
-			}
-			mArtists.add(ja);
-		}
-
-		adapter = new JazzAdapter(mArtists);
-
-		setListAdapter(adapter);
-
+		mNotFollowAdapter = new NotFollowAdapter(MainActivity.this, notFollowList);
+		notFollowListView.setAdapter(mNotFollowAdapter);
 	}
 
-	private class JazzArtist {
-		public String name;
-		public String albums;
-
-		@Override
-		public String toString() {
-			return name;
-		}
+	private void initView() {
+		followListView = (DragSortListView) findViewById(R.id.follow_list);
+		notFollowListView = (ListView) findViewById(R.id.not_follow_list);
 	}
 
-	private class ViewHolder {
-		public TextView albumsView;
+	private void initData() {
+		// followList = NewsCategoryDao.getInstance(context).queryAll();
+		Column column1 = new Column();
+		column1.id = 1;
+		column1.name = "国际足球";
+		followList.add(column1);
+		allList.add(column1);
+
+		Column column2 = new Column();
+		column2.id = 2;
+		column2.name = "NBA";
+		followList.add(column2);
+		allList.add(column2);
+
+		Column column3 = new Column();
+		column3.id = 3;
+		column3.name = "中国足球";
+		followList.add(column3);
+		allList.add(column3);
+
+		Column column4 = new Column();
+		column4.id = 4;
+		column4.name = "中国蓝球";
+		followList.add(column4);
+		allList.add(column4);
+
+		Column column5 = new Column();
+		column5.id = 5;
+		column5.name = "视频";
+		followList.add(column5);
+		allList.add(column5);
 	}
 
-	private class JazzAdapter extends ArrayAdapter<JazzArtist> {
-
-		public JazzAdapter(List<JazzArtist> artists) {
-			super(MainActivity.this, R.layout.jazz_artist_list_item,
-					R.id.artist_name_textview, artists);
+	private void initSavaData() {
+		preferences = getSharedPreferences("column",
+				MODE_WORLD_READABLE);
+		editor = preferences.edit();
+		for (int i = 0; i < followList.size(); i++) {
+			editor.putBoolean(followList.get(i).name, true);
 		}
+		editor.commit();
+	}
 
-		public View getView(int position, View convertView, ViewGroup parent) {
-			View v = super.getView(position, convertView, parent);
+	public FollowAdapter getFollowAdapter() {
+		return mFollowAdapter;
+	}
 
-			if (v != convertView && v != null) {
-				ViewHolder holder = new ViewHolder();
+	public ArrayList<Column> getFollowList() {
+		return followList;
+	}
 
-				TextView tv = (TextView) v
-						.findViewById(R.id.artist_albums_textview);
-				holder.albumsView = tv;
+	public NotFollowAdapter getNotFollowAdapter() {
+		return mNotFollowAdapter;
+	}
 
-				v.setTag(holder);
-			}
-
-			ViewHolder holder = (ViewHolder) v.getTag();
-			String albums = getItem(position).albums;
-
-			holder.albumsView.setText(albums);
-
-			return v;
-		}
+	public ArrayList<Column> getNotFollowList() {
+		return notFollowList;
 	}
 
 }
